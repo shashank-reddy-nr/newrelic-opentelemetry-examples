@@ -8,7 +8,7 @@ This example demonstrates monitoring a [Strimzi](https://strimzi.io/)-managed Ka
 
 ## Requirements
 
-* Kubernetes cluster with `kubectl` configured — [Docker Desktop](https://docs.docker.com/desktop/) with Kubernetes enabled works for local testing
+* You need to have a Kubernetes cluster, and the `kubectl` command-line tool must be configured to communicate with your cluster. [k3s](https://k3s.io/) is a lightweight option for EC2/Linux VMs (or Docker Desktop [includes a standalone Kubernetes server and client](https://docs.docker.com/desktop/kubernetes/) for local testing).
 * [A New Relic account](https://one.newrelic.com/)
 * [A New Relic license key](https://docs.newrelic.com/docs/apis/intro-apis/new-relic-api-keys/#license-key)
 
@@ -70,9 +70,9 @@ SINCE 5 minutes ago LIMIT MAX
 To view consumer group lag collected by the `kafkametrics` receiver:
 
 ```sql
-FROM Metric SELECT latest(kafka.consumer_group.lag)
+FROM Metric SELECT latest(kafka.consumer_group.lag_sum)
 WHERE kafka.cluster.name = 'kafka-strimzi-cluster'
-FACET topic, group
+FACET group, topic
 SINCE 5 minutes ago
 ```
 

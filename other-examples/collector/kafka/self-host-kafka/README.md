@@ -55,9 +55,9 @@ SINCE 5 minutes ago LIMIT MAX
 To view consumer group lag collected by the `kafkametrics` receiver:
 
 ```sql
-FROM Metric SELECT latest(kafka.consumer.lag)
+FROM Metric SELECT latest(kafka.consumer_group.lag_sum)
 WHERE kafka.cluster.name = 'kafka-selfhost-cluster'
-FACET topic, group
+FACET group, topic
 SINCE 5 minutes ago
 ```
 
