@@ -26,6 +26,7 @@ metadata:
 data:
   jmx-custom-config.yaml: |
     rules:
+      # Per-topic custom metrics
       - bean: kafka.server:type=BrokerTopicMetrics,name=MessagesInPerSec,topic=*
         metricAttribute:
           topic: param(topic)
@@ -58,6 +59,7 @@ data:
             desc: The bytes received or sent per topic
             unit: By
 
+      # Cluster-level metrics using controller-based MBeans
       - bean: kafka.controller:type=KafkaController,name=GlobalTopicCount
         mapping:
           Value:
@@ -90,6 +92,7 @@ data:
             desc: The count of topic partitions for which the leader is not the preferred leader
             unit: "{partition}"
 
+      # Broker-level metrics using ReplicaManager MBeans
       - bean: kafka.server:type=ReplicaManager,name=UnderMinIsrPartitionCount
         mapping:
           Value:
@@ -98,6 +101,7 @@ data:
             desc: The number of partitions where the number of in-sync replicas is less than the minimum
             unit: "{partition}"
 
+      # Broker uptime metric using JVM Runtime
       - bean: java.lang:type=Runtime
         mapping:
           Uptime:
@@ -106,6 +110,7 @@ data:
             desc: Broker uptime in milliseconds
             unit: ms
 
+      # Leader count per broker
       - bean: kafka.server:type=ReplicaManager,name=LeaderCount
         mapping:
           Value:
@@ -114,6 +119,7 @@ data:
             desc: Number of partitions for which this broker is the leader
             unit: "{partition}"
 
+      # JVM metrics
       - bean: java.lang:type=GarbageCollector,name=*
         mapping:
           CollectionCount:
@@ -134,6 +140,7 @@ data:
       - bean: java.lang:type=Memory
         unit: By
         prefix: jvm.memory.
+        dropNegativeValues: true
         mapping:
           HeapMemoryUsage.committed:
             metric: heap.committed
@@ -154,26 +161,61 @@ data:
             metric: jvm.thread.count
             type: gauge
             unit: "{thread}"
-            desc: Total thread count
+            desc: Total thread count (Kafka typical range 100-300 threads)
 
       - bean: java.lang:type=OperatingSystem
         prefix: jvm.
+        dropNegativeValues: true
         mapping:
           SystemLoadAverage:
             metric: system.cpu.load_1m
             type: gauge
+            unit: "{run_queue_item}"
+            desc: System load average (1 minute) - alert if > CPU count
           AvailableProcessors:
             metric: cpu.count
             type: gauge
+            unit: "{cpu}"
+            desc: Number of processors available
           ProcessCpuLoad:
             metric: cpu.recent_utilization
             type: gauge
+            unit: '1'
+            desc: Recent CPU utilization for JVM process (0.0 to 1.0)
           SystemCpuLoad:
             metric: system.cpu.utilization
             type: gauge
+            unit: '1'
+            desc: Recent CPU utilization for whole system (0.0 to 1.0)
           OpenFileDescriptorCount:
             metric: file_descriptor.count
             type: gauge
+            unit: "{file_descriptor}"
+            desc: Number of open file descriptors - alert if > 80% of ulimit
+
+      - bean: java.lang:type=ClassLoading
+        mapping:
+          LoadedClassCount:
+            metric: jvm.class.count
+            type: gauge
+            unit: "{class}"
+            desc: Currently loaded class count
+
+      - bean: java.lang:type=MemoryPool,name=*
+        type: gauge
+        unit: By
+        metricAttribute:
+          name: param(name)
+        mapping:
+          Usage.used:
+            metric: jvm.memory.pool.used
+            desc: Memory pool usage by generation (G1 Old Gen, Eden, Survivor)
+          Usage.max:
+            metric: jvm.memory.pool.max
+            desc: Maximum memory pool size
+          CollectionUsage.used:
+            metric: jvm.memory.pool.used_after_last_gc
+            desc: Memory used after last GC (shows retained memory baseline)
 
       - bean: kafka.server:type=BrokerTopicMetrics,name=MessagesInPerSec
         mapping:
@@ -183,25 +225,45 @@ data:
             desc: The number of messages received by the broker
             unit: "{message}"
 
-      - bean: kafka.server:type=BrokerTopicMetrics,name=BytesInPerSec
+      - bean: kafka.server:type=BrokerTopicMetrics,name=TotalFetchRequestsPerSec
         metricAttribute:
-          direction: const(in)
+          type: const(fetch)
         mapping:
           Count:
-            metric: kafka.network.io
-            type: counter
-            desc: The bytes received or sent by the broker
-            unit: By
+            metric: &metric kafka.request.count
+            type: &type counter
+            desc: &desc The number of requests received by the broker
+            unit: &unit "{request}"
 
-      - bean: kafka.server:type=BrokerTopicMetrics,name=BytesOutPerSec
+      - bean: kafka.server:type=BrokerTopicMetrics,name=TotalProduceRequestsPerSec
         metricAttribute:
-          direction: const(out)
+          type: const(produce)
         mapping:
           Count:
-            metric: kafka.network.io
-            type: counter
-            desc: The bytes received or sent by the broker
-            unit: By
+            metric: *metric
+            type: *type
+            desc: *desc
+            unit: *unit
+
+      - bean: kafka.server:type=BrokerTopicMetrics,name=FailedFetchRequestsPerSec
+        metricAttribute:
+          type: const(fetch)
+        mapping:
+          Count:
+            metric: &metric kafka.request.failed
+            type: &type counter
+            desc: &desc The number of requests to the broker resulting in a failure
+            unit: &unit "{request}"
+
+      - bean: kafka.server:type=BrokerTopicMetrics,name=FailedProduceRequestsPerSec
+        metricAttribute:
+          type: const(produce)
+        mapping:
+          Count:
+            metric: *metric
+            type: *type
+            desc: *desc
+            unit: *unit
 
       - beans:
           - kafka.network:type=RequestMetrics,name=TotalTimeMs,request=Produce
@@ -228,6 +290,46 @@ data:
             type: gauge
             desc: The average time the broker has taken to service requests
 
+      - bean: kafka.network:type=RequestChannel,name=RequestQueueSize
+        mapping:
+          Value:
+            metric: kafka.request.queue
+            type: gauge
+            desc: Size of the request queue
+            unit: "{request}"
+
+      - bean: kafka.server:type=BrokerTopicMetrics,name=BytesInPerSec
+        metricAttribute:
+          direction: const(in)
+        mapping:
+          Count:
+            metric: &metric kafka.network.io
+            type: &type counter
+            desc: &desc The bytes received or sent by the broker
+            unit: &unit By
+
+      - bean: kafka.server:type=BrokerTopicMetrics,name=BytesOutPerSec
+        metricAttribute:
+          direction: const(out)
+        mapping:
+          Count:
+            metric: *metric
+            type: *type
+            desc: *desc
+            unit: *unit
+
+      - beans:
+          - kafka.server:type=DelayedOperationPurgatory,name=PurgatorySize,delayedOperation=Produce
+          - kafka.server:type=DelayedOperationPurgatory,name=PurgatorySize,delayedOperation=Fetch
+        metricAttribute:
+          type: param(delayedOperation)
+        mapping:
+          Value:
+            metric: kafka.purgatory.size
+            type: gauge
+            desc: The number of requests waiting in purgatory
+            unit: "{request}"
+
       - bean: kafka.server:type=ReplicaManager,name=PartitionCount
         mapping:
           Value:
@@ -252,12 +354,40 @@ data:
             desc: The number of under replicated partitions
             unit: "{partition}"
 
+      - bean: kafka.server:type=ReplicaManager,name=IsrShrinksPerSec
+        metricAttribute:
+          operation: const(shrink)
+        mapping:
+          Count:
+            metric: kafka.isr.operation.count
+            type: counter
+            desc: The number of in-sync replica shrink and expand operations
+            unit: "{operation}"
+
+      - bean: kafka.server:type=ReplicaManager,name=IsrExpandsPerSec
+        metricAttribute:
+          operation: const(expand)
+        mapping:
+          Count:
+            metric: kafka.isr.operation.count
+            type: counter
+            desc: The number of in-sync replica shrink and expand operations
+            unit: "{operation}"
+
+      - bean: kafka.server:type=ReplicaFetcherManager,name=MaxLag,clientId=Replica
+        mapping:
+          Value:
+            metric: kafka.max.lag
+            type: gauge
+            desc: The max lag in messages between follower and leader replicas
+            unit: "{message}"
+
       - bean: kafka.controller:type=KafkaController,name=ActiveControllerCount
         mapping:
           Value:
             metric: kafka.controller.active.count
             type: gauge
-            desc: The number of active controllers in the cluster
+            desc: For KRaft mode, the number of active controllers in the cluster. For ZooKeeper, indicates whether the broker is the controller broker.
             unit: "{controller}"
 
       - bean: kafka.controller:type=ControllerStats,name=LeaderElectionRateAndTimeMs
@@ -273,8 +403,25 @@ data:
           Count:
             metric: kafka.unclean.election.rate
             type: counter
-            desc: Unclean leader election count
+            desc: Unclean leader election count - increasing indicates broker failures
             unit: "{election}"
+
+      - bean: kafka.log:type=LogFlushStats,name=LogFlushRateAndTimeMs
+        unit: ms
+        type: gauge
+        prefix: kafka.logs.flush.
+        mapping:
+          Count:
+            metric: count
+            unit: '{flush}'
+            type: counter
+            desc: Log flush count
+          50thPercentile:
+            metric: time.50p
+            desc: Log flush time - 50th percentile
+          99thPercentile:
+            metric: time.99p
+            desc: Log flush time - 99th percentile
 
 ---
 # ── Headless Service (pod-to-pod DNS + KRaft quorum) ─────────────────────

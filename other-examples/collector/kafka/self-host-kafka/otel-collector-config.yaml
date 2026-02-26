@@ -160,3 +160,4 @@ service:
       receivers: [otlp]
       processors: [resourcedetection, resource, batch/apps]
       exporters: [otlp/newrelic]
+

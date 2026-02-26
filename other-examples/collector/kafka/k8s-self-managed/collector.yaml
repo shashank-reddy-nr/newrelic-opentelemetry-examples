@@ -40,7 +40,7 @@ data:
           - brokers
           - topics
           - consumers
-        collection_interval: ${env:KAFKA_METRICS_COLLECTION_INTERVAL}
+        collection_interval: 30s
         topic_match: ".*"
         metrics:
           kafka.topic.min_insync_replicas:
@@ -63,6 +63,15 @@ data:
         send_batch_size: 1024
         timeout: 5s
 
+      resourcedetection:
+        detectors: [env, system]
+        system:
+          resource_attributes:
+            host.name:
+              enabled: true
+            host.id:
+              enabled: true
+
       resource:
         attributes:
           - action: insert
@@ -73,7 +82,16 @@ data:
         metric_statements:
           - context: resource
             statements:
-              - delete_key(resource.attributes, "broker.id")
+              - delete_key(attributes, "broker.id")
+
+      transform/remove_extra_attributes:
+        metric_statements:
+          - context: resource
+            statements:
+              - delete_matching_keys(attributes, "^process\\..*")
+              - delete_matching_keys(attributes, "^telemetry\\..*")
+              - delete_key(attributes, "host.arch")
+              - delete_key(attributes, "os.description")
 
       filter/include_cluster_metrics:
         metrics:
@@ -103,8 +121,8 @@ data:
         metric_statements:
           - context: metric
             statements:
-              - set(metric.description, "") where metric.description != ""
-              - set(metric.unit, "") where metric.unit != ""
+              - set(description, "") where description != ""
+              - set(unit, "") where unit != ""
 
       cumulativetodelta: {}
 
@@ -144,12 +162,12 @@ data:
       pipelines:
         metrics/broker:
           receivers: [otlp, kafkametrics]
-          processors: [resource, filter/exclude_cluster_metrics, transform/des_units, cumulativetodelta, metricstransform/kafka_topic_sum_aggregation, filter/remove_partition_level_replicas, batch/aggregation]
+          processors: [resourcedetection, resource, filter/exclude_cluster_metrics, transform/remove_extra_attributes, transform/des_units, cumulativetodelta, metricstransform/kafka_topic_sum_aggregation, filter/remove_partition_level_replicas, batch/aggregation]
           exporters: [otlp/newrelic]
 
         metrics/cluster:
           receivers: [otlp]
-          processors: [resource, filter/include_cluster_metrics, transform/remove_broker_id, transform/des_units, cumulativetodelta, batch/aggregation]
+          processors: [resourcedetection, resource, filter/include_cluster_metrics, transform/remove_broker_id, transform/remove_extra_attributes, transform/des_units, cumulativetodelta, batch/aggregation]
           exporters: [otlp/newrelic]
 
         traces/apps:
@@ -194,8 +212,6 @@ spec:
             # Edit to match KAFKA_CLUSTER_NAME in kafka.yaml
             - name: KAFKA_CLUSTER_NAME
               value: "kafka-k8s-cluster"
-            - name: KAFKA_METRICS_COLLECTION_INTERVAL
-              value: "30s"
           volumeMounts:
             - name: config
               mountPath: /etc/otelcol-contrib

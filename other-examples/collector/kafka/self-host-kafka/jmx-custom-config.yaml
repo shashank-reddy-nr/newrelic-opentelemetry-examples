@@ -119,6 +119,7 @@ rules:
   - bean: java.lang:type=Memory
     unit: By
     prefix: jvm.memory.
+    dropNegativeValues: true
     mapping:
       HeapMemoryUsage.committed:
         metric: heap.committed
@@ -139,16 +140,17 @@ rules:
         metric: jvm.thread.count
         type: gauge
         unit: "{thread}"
-        desc: Total thread count
+        desc: Total thread count (Kafka typical range 100-300 threads)
 
   - bean: java.lang:type=OperatingSystem
     prefix: jvm.
+    dropNegativeValues: true
     mapping:
       SystemLoadAverage:
         metric: system.cpu.load_1m
         type: gauge
         unit: "{run_queue_item}"
-        desc: System load average (1 minute)
+        desc: System load average (1 minute) - alert if > CPU count
       AvailableProcessors:
         metric: cpu.count
         type: gauge
@@ -157,18 +159,18 @@ rules:
       ProcessCpuLoad:
         metric: cpu.recent_utilization
         type: gauge
-        unit: "1"
+        unit: '1'
         desc: Recent CPU utilization for JVM process (0.0 to 1.0)
       SystemCpuLoad:
         metric: system.cpu.utilization
         type: gauge
-        unit: "1"
+        unit: '1'
         desc: Recent CPU utilization for whole system (0.0 to 1.0)
       OpenFileDescriptorCount:
         metric: file_descriptor.count
         type: gauge
         unit: "{file_descriptor}"
-        desc: Number of open file descriptors
+        desc: Number of open file descriptors - alert if > 80% of ulimit
 
   - bean: java.lang:type=ClassLoading
     mapping:
@@ -186,13 +188,13 @@ rules:
     mapping:
       Usage.used:
         metric: jvm.memory.pool.used
-        desc: Memory pool usage by generation
+        desc: Memory pool usage by generation (G1 Old Gen, Eden, Survivor)
       Usage.max:
         metric: jvm.memory.pool.max
         desc: Maximum memory pool size
       CollectionUsage.used:
         metric: jvm.memory.pool.used_after_last_gc
-        desc: Memory used after last GC
+        desc: Memory used after last GC (shows retained memory baseline)
 
   # ── Broker throughput metrics ──────────────────────────────────────────────
 
@@ -229,20 +231,20 @@ rules:
       type: const(fetch)
     mapping:
       Count:
-        metric: &metric2 kafka.request.failed
-        type: &type2 counter
-        desc: &desc2 The number of requests to the broker resulting in a failure
-        unit: &unit2 "{request}"
+        metric: &metric kafka.request.failed
+        type: &type counter
+        desc: &desc The number of requests to the broker resulting in a failure
+        unit: &unit "{request}"
 
   - bean: kafka.server:type=BrokerTopicMetrics,name=FailedProduceRequestsPerSec
     metricAttribute:
       type: const(produce)
     mapping:
       Count:
-        metric: *metric2
-        type: *type2
-        desc: *desc2
-        unit: *unit2
+        metric: *metric
+        type: *type
+        desc: *desc
+        unit: *unit
 
   - beans:
       - kafka.network:type=RequestMetrics,name=TotalTimeMs,request=Produce
@@ -282,20 +284,20 @@ rules:
       direction: const(in)
     mapping:
       Count:
-        metric: &metric3 kafka.network.io
-        type: &type3 counter
-        desc: &desc3 The bytes received or sent by the broker
-        unit: &unit3 By
+        metric: &metric kafka.network.io
+        type: &type counter
+        desc: &desc The bytes received or sent by the broker
+        unit: &unit By
 
   - bean: kafka.server:type=BrokerTopicMetrics,name=BytesOutPerSec
     metricAttribute:
       direction: const(out)
     mapping:
       Count:
-        metric: *metric3
-        type: *type3
-        desc: *desc3
-        unit: *unit3
+        metric: *metric
+        type: *type
+        desc: *desc
+        unit: *unit
 
   - beans:
       - kafka.server:type=DelayedOperationPurgatory,name=PurgatorySize,delayedOperation=Produce
@@ -366,7 +368,7 @@ rules:
       Value:
         metric: kafka.controller.active.count
         type: gauge
-        desc: The number of active controllers in the cluster
+        desc: For KRaft mode, the number of active controllers in the cluster. For ZooKeeper, indicates whether the broker is the controller broker.
         unit: "{controller}"
 
   - bean: kafka.controller:type=ControllerStats,name=LeaderElectionRateAndTimeMs
@@ -382,7 +384,7 @@ rules:
       Count:
         metric: kafka.unclean.election.rate
         type: counter
-        desc: Unclean leader election count
+        desc: Unclean leader election count - increasing indicates broker failures
         unit: "{election}"
 
   - bean: kafka.log:type=LogFlushStats,name=LogFlushRateAndTimeMs
