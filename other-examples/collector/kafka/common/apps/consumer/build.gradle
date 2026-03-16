@@ -11,7 +11,6 @@ java { sourceCompatibility = JavaVersion.VERSION_21 }
 repositories { mavenCentral() }
 
 dependencies {
-    // Only kafka-clients needed — OTel instrumentation is via javaagent, zero code change
     implementation 'org.apache.kafka:kafka-clients:3.8.1'
 }
 

@@ -14,7 +14,8 @@ receivers:
       - topics
       - consumers
     collection_interval: ${env:KAFKA_METRICS_COLLECTION_INTERVAL}
-    topic_match: ".*"
+    # Collect all topics (filtering will happen in the processor)
+    topic_match: "^[^_].*$"
     metrics:
       kafka.topic.min_insync_replicas:
         enabled: true
@@ -68,6 +69,18 @@ processors:
           - delete_matching_keys(attributes, "^telemetry\\..*")
           - delete_key(attributes, "host.arch")
           - delete_key(attributes, "os.description")
+          - delete_key(attributes, "host.image.id")
+          - delete_key(attributes, "host.type")
+          - delete_matching_keys(attributes, "^cloud\\..*")
+          - delete_key(attributes, "service.instance.id") where IsMatch(attributes["service.name"], "^unknown_service:")
+          - delete_key(attributes, "service.name") where IsMatch(attributes["service.name"], "^unknown_service:")
+
+  # Filter internal topics from JMX per-topic metrics
+  filter/internal_topics:
+    metrics:
+      datapoint:
+        # Drop datapoints where topic attribute starts with "__"
+        - 'attributes["topic"] != nil and IsMatch(attributes["topic"], "^__.*")'
 
   filter/include_cluster_metrics:
     metrics:
@@ -140,13 +153,31 @@ service:
     # Broker metrics pipeline (excludes cluster-level metrics)
     metrics/broker:
       receivers: [otlp, kafkametrics]
-      processors: [resourcedetection, resource, filter/exclude_cluster_metrics, transform/remove_extra_attributes, transform/des_units, cumulativetodelta, metricstransform/kafka_topic_sum_aggregation, filter/remove_partition_level_replicas, batch/aggregation]
+      processors:
+        - resourcedetection
+        - resource
+        - filter/exclude_cluster_metrics
+        - filter/internal_topics
+        - transform/remove_extra_attributes
+        - transform/des_units
+        - cumulativetodelta
+        - metricstransform/kafka_topic_sum_aggregation
+        - filter/remove_partition_level_replicas
+        - batch/aggregation
       exporters: [otlp/newrelic]
 
     # Cluster metrics pipeline (only cluster-level metrics, no broker.id)
     metrics/cluster:
       receivers: [otlp]
-      processors: [resourcedetection, resource, filter/include_cluster_metrics, transform/remove_broker_id, transform/remove_extra_attributes, transform/des_units, cumulativetodelta, batch/aggregation]
+      processors:
+        - resourcedetection
+        - resource
+        - filter/include_cluster_metrics
+        - transform/remove_broker_id
+        - transform/remove_extra_attributes
+        - transform/des_units
+        - cumulativetodelta
+        - batch/aggregation
       exporters: [otlp/newrelic]
 
     # APM traces pipeline (producer + consumer spans via OTel Java Agent)
@@ -160,4 +191,3 @@ service:
       receivers: [otlp]
       processors: [resourcedetection, resource, batch/apps]
       exporters: [otlp/newrelic]
-

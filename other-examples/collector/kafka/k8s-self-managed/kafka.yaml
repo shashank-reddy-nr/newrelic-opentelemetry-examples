@@ -544,6 +544,7 @@ spec:
                 -javaagent:/opt/otel-agent/opentelemetry-javaagent.jar
                 -Dotel.jmx.enabled=true
                 -Dotel.jmx.config=/etc/kafka/jmx-custom-config.yaml
+                -Dotel.instrumentation.runtime-telemetry.enabled=false
                 -Dotel.resource.attributes=kafka.cluster.name=$(KAFKA_CLUSTER_NAME)
                 -Dotel.exporter.otlp.endpoint=http://otel-collector:4317
                 -Dotel.exporter.otlp.protocol=grpc

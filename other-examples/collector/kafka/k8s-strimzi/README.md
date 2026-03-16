@@ -37,7 +37,7 @@ This example demonstrates monitoring a [Strimzi](https://strimzi.io/)-managed Ka
 
 3. Deploy the Kafka cluster and OTel Collector:
     ```shell
-    kubectl apply -f .
+    kubectl apply -f kafka.yaml -f secrets.yaml -f collector.yaml
     ```
 
     Wait for Kafka to be ready (~3–5 minutes):
@@ -49,12 +49,10 @@ This example demonstrates monitoring a [Strimzi](https://strimzi.io/)-managed Ka
 ## Tear Down
 
 ```shell
-kubectl delete -f .
+kubectl delete -f collector.yaml -f secrets.yaml -f kafka.yaml
 kubectl delete -f 'https://strimzi.io/install/latest?namespace=kafka'
 kubectl delete namespace kafka
 ```
-
-> **Note:** `kubectl delete -f .` removes the `kafka` namespace and everything in it, including the Strimzi operator. If you want to redeploy without tearing down the namespace, delete individual resources instead.
 
 ## Viewing your data
 

@@ -75,6 +75,7 @@ services:
         -javaagent:/opt/otel-agent/opentelemetry-javaagent.jar
         -Dotel.jmx.enabled=true
         -Dotel.jmx.config=/etc/kafka/jmx-custom-config.yaml
+        -Dotel.instrumentation.runtime-telemetry.enabled=false
         -Dotel.resource.attributes=broker.id=1,kafka.cluster.name=${KAFKA_CLUSTER_NAME:-kafka-selfhost-cluster}
         -Dotel.exporter.otlp.endpoint=http://otel-collector:4317
         -Dotel.exporter.otlp.protocol=grpc
@@ -97,6 +98,7 @@ services:
         -javaagent:/opt/otel-agent/opentelemetry-javaagent.jar
         -Dotel.jmx.enabled=true
         -Dotel.jmx.config=/etc/kafka/jmx-custom-config.yaml
+        -Dotel.instrumentation.runtime-telemetry.enabled=false
         -Dotel.resource.attributes=broker.id=2,kafka.cluster.name=${KAFKA_CLUSTER_NAME:-kafka-selfhost-cluster}
         -Dotel.exporter.otlp.endpoint=http://otel-collector:4317
         -Dotel.exporter.otlp.protocol=grpc
@@ -169,6 +171,7 @@ services:
       OTEL_METRICS_EXPORTER: otlp
       OTEL_TRACES_EXPORTER: otlp
       OTEL_LOGS_EXPORTER: none
+      OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED: "false"
       MESSAGE_INTERVAL_MS: ${MESSAGE_INTERVAL_MS:-200}
     restart: on-failure
 
@@ -196,6 +199,7 @@ services:
       OTEL_METRICS_EXPORTER: otlp
       OTEL_TRACES_EXPORTER: otlp
       OTEL_LOGS_EXPORTER: none
+      OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED: "false"
     restart: on-failure
 
 volumes:

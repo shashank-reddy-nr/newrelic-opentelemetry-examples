@@ -4,8 +4,7 @@
 # Inline pipeline config in a ConfigMap — no Helm required.
 #
 # To customize:
-#   - Edit KAFKA_CLUSTER_NAME (must match kafka.yaml)
-#   - Edit NEW_RELIC_OTLP_ENDPOINT for EU accounts
+#   - Edit collector-env-config ConfigMap values (KAFKA_CLUSTER_NAME, NEW_RELIC_OTLP_ENDPOINT)
 #
 # Apply:
 #   kubectl apply -f secrets.yaml   # create newrelic-secret first
@@ -41,7 +40,7 @@ data:
           - topics
           - consumers
         collection_interval: 30s
-        topic_match: ".*"
+        topic_match: "^[^_].*$"
         metrics:
           kafka.topic.min_insync_replicas:
             enabled: true
@@ -63,15 +62,6 @@ data:
         send_batch_size: 1024
         timeout: 5s
 
-      resourcedetection:
-        detectors: [env, system]
-        system:
-          resource_attributes:
-            host.name:
-              enabled: true
-            host.id:
-              enabled: true
-
       resource:
         attributes:
           - action: insert
@@ -92,6 +82,17 @@ data:
               - delete_matching_keys(attributes, "^telemetry\\..*")
               - delete_key(attributes, "host.arch")
               - delete_key(attributes, "os.description")
+              - delete_key(attributes, "host.image.id")
+              - delete_key(attributes, "host.type")
+              - delete_matching_keys(attributes, "^cloud\\..*")
+              - delete_key(attributes, "service.instance.id") where IsMatch(attributes["service.name"], "^unknown_service:")
+              - delete_key(attributes, "service.name") where IsMatch(attributes["service.name"], "^unknown_service:")
+
+      # Filter internal Kafka topics as a safety net (topic_match handles the receiver side)
+      filter/internal_topics:
+        metrics:
+          datapoint:
+            - 'attributes["topic"] != nil and IsMatch(attributes["topic"], "^__.*")'
 
       filter/include_cluster_metrics:
         metrics:
@@ -162,12 +163,12 @@ data:
       pipelines:
         metrics/broker:
           receivers: [otlp, kafkametrics]
-          processors: [resourcedetection, resource, filter/exclude_cluster_metrics, transform/remove_extra_attributes, transform/des_units, cumulativetodelta, metricstransform/kafka_topic_sum_aggregation, filter/remove_partition_level_replicas, batch/aggregation]
+          processors: [resource, filter/exclude_cluster_metrics, filter/internal_topics, transform/remove_extra_attributes, transform/des_units, cumulativetodelta, metricstransform/kafka_topic_sum_aggregation, filter/remove_partition_level_replicas, batch/aggregation]
           exporters: [otlp/newrelic]
 
         metrics/cluster:
           receivers: [otlp]
-          processors: [resourcedetection, resource, filter/include_cluster_metrics, transform/remove_broker_id, transform/remove_extra_attributes, transform/des_units, cumulativetodelta, batch/aggregation]
+          processors: [resource, filter/include_cluster_metrics, transform/remove_broker_id, transform/remove_extra_attributes, transform/des_units, cumulativetodelta, batch/aggregation]
           exporters: [otlp/newrelic]
 
         traces/apps:
@@ -179,6 +180,20 @@ data:
           receivers: [otlp]
           processors: [resource, batch/apps]
           exporters: [otlp/newrelic]
+
+---
+# ── Collector environment config (non-sensitive) ─────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: collector-env-config
+  namespace: kafka
+data:
+  # US accounts (default): https://otlp.nr-data.net:4317
+  # EU accounts: https://otlp.eu01.nr-data.net:4317
+  NEW_RELIC_OTLP_ENDPOINT: "https://otlp.nr-data.net:4317"
+  # Edit to match KAFKA_CLUSTER_NAME in kafka.yaml
+  KAFKA_CLUSTER_NAME: "kafka-k8s-cluster"
 
 ---
 # ── Collector Deployment ──────────────────────────────────────────────────
@@ -206,12 +221,16 @@ spec:
                 secretKeyRef:
                   name: newrelic-secret
                   key: licenseKey
-            # US endpoint (default). EU accounts: https://otlp.eu01.nr-data.net:4317
             - name: NEW_RELIC_OTLP_ENDPOINT
-              value: "https://otlp.nr-data.net:4317"
-            # Edit to match KAFKA_CLUSTER_NAME in kafka.yaml
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-env-config
+                  key: NEW_RELIC_OTLP_ENDPOINT
             - name: KAFKA_CLUSTER_NAME
-              value: "kafka-k8s-cluster"
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-env-config
+                  key: KAFKA_CLUSTER_NAME
           volumeMounts:
             - name: config
               mountPath: /etc/otelcol-contrib

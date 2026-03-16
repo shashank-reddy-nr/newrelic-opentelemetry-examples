@@ -36,7 +36,7 @@ spec:
       containers:
         - name: kafka-producer
           image: kafka-producer:latest
-          imagePullPolicy: Never   # Use locally built image
+          imagePullPolicy: Never
           env:
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: "kafka:9092"
@@ -50,10 +50,15 @@ spec:
               value: "otlp"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
+            - name: OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED
+              value: "false"
             - name: OTEL_SERVICE_NAME
               value: "kafka-producer"
             - name: KAFKA_CLUSTER_NAME
-              value: "kafka-k8s-cluster"
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-env-config
+                  key: KAFKA_CLUSTER_NAME
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: "kafka.cluster.name=$(KAFKA_CLUSTER_NAME)"
             - name: MESSAGE_INTERVAL_MS
@@ -79,7 +84,7 @@ spec:
       containers:
         - name: kafka-consumer
           image: kafka-consumer:latest
-          imagePullPolicy: Never   # Use locally built image
+          imagePullPolicy: Never
           env:
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: "kafka:9092"
@@ -93,10 +98,15 @@ spec:
               value: "otlp"
             - name: OTEL_LOGS_EXPORTER
               value: "none"
+            - name: OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED
+              value: "false"
             - name: OTEL_SERVICE_NAME
               value: "kafka-consumer"
             - name: KAFKA_CLUSTER_NAME
-              value: "kafka-k8s-cluster"
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-env-config
+                  key: KAFKA_CLUSTER_NAME
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: "kafka.cluster.name=$(KAFKA_CLUSTER_NAME)"
             - name: KAFKA_GROUP_ID

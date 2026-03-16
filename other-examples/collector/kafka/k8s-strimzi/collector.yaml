@@ -71,6 +71,7 @@ data:
           - brokers
           - topics
           - consumers
+        topic_match: "^[^_].*$"
         metrics:
           kafka.topic.min_insync_replicas:
             enabled: true
@@ -242,6 +243,12 @@ data:
             metric_names:
               - kafka.partition.replicas_in_sync
 
+      # Filter internal Kafka topics as a safety net (topic_match handles the receiver side)
+      filter/internal_topics:
+        metrics:
+          datapoint:
+            - 'attributes["topic"] != nil and IsMatch(attributes["topic"], "^__.*")'
+
       cumulativetodelta: {}
 
     exporters:
@@ -291,6 +298,7 @@ data:
           receivers: [kafkametrics/cluster]
           processors:
             - resource/cluster-name
+            - filter/internal_topics
             - transform/remove_attributes
             - metricstransform/topic-aggregation
             - filter/exclude_partition_replicas_metric

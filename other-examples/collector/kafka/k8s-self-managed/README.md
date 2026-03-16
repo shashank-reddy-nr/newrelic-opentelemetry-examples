@@ -29,7 +29,7 @@ This example demonstrates monitoring a self-managed Apache Kafka cluster on Kube
 
 2. Deploy the Kafka cluster and OTel Collector:
     ```shell
-    kubectl apply -f .
+    kubectl apply -f kafka.yaml -f secrets.yaml -f collector.yaml
     ```
 
     Verify all pods are running:
@@ -50,7 +50,7 @@ This example demonstrates monitoring a self-managed Apache Kafka cluster on Kube
 
 When finished, tear down all resources with the following command:
 ```shell
-kubectl delete -f .
+kubectl delete namespace kafka
 ```
 
 ## Viewing your data
