@@ -14,12 +14,11 @@ This example demonstrates monitoring a self-hosted Apache Kafka cluster using th
 
 ## Running the example
 
-1. Create your secrets file from the template and update the values:
+1. Copy the example environment file and set your New Relic license key — this is **required**:
     ```shell
     cp .env.example .env
-    # Edit .env with your New Relic license key
     ```
-    See the [New Relic docs](https://docs.newrelic.com/docs/apis/intro-apis/new-relic-api-keys/#license-key) for how to obtain a license key.
+    Open `.env` and replace `YOUR_LICENSE_KEY_HERE` with your [New Relic license key](https://docs.newrelic.com/docs/apis/intro-apis/new-relic-api-keys/#license-key).
 
     * If your account is based in the EU, update the `NEW_RELIC_OTLP_ENDPOINT` value in [.env](./.env.example) to:
 

@@ -132,7 +132,9 @@ services:
   # OpenTelemetry Collector
   # ─────────────────────────────────────────────
   otel-collector:
-    image: ${OTEL_COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib:latest}
+    # NRDOT is New Relic's OTel distribution; swap image in .env to use upstream otelcol-contrib.
+    image: ${OTEL_COLLECTOR_IMAGE:-newrelic/nrdot-collector:latest}
+    command: ["--config=/etc/otelcol/config.yaml"]
     container_name: otel-collector
     depends_on:
       kafka-broker-1:
@@ -140,7 +142,7 @@ services:
     ports:
       - "4317:4317"   # OTLP gRPC
     volumes:
-      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
     environment:
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
       - NEW_RELIC_OTLP_ENDPOINT=${NEW_RELIC_OTLP_ENDPOINT:-https://otlp.nr-data.net:4317}

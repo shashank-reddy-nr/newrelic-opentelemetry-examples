@@ -14,18 +14,13 @@ This example demonstrates monitoring a self-managed Apache Kafka cluster on Kube
 
 ## Running the example
 
-1. Create your secrets file from the template and update the values:
+1. Copy the secrets template and fill in your values — `NEW_RELIC_LICENSE_KEY` is **required**:
     ```shell
     cp secrets.yaml.template secrets.yaml
-    # Edit secrets.yaml with your New Relic license key
     ```
-    See the [New Relic docs](https://docs.newrelic.com/docs/apis/intro-apis/new-relic-api-keys/#license-key) for how to obtain a license key.
-
-    * If your account is based in the EU, update the `NEW_RELIC_OTLP_ENDPOINT` value in [collector.yaml](./collector.yaml) to:
-
-    ```shell
-    NEW_RELIC_OTLP_ENDPOINT=https://otlp.eu01.nr-data.net:4317
-    ```
+    Open `secrets.yaml` and update:
+    - `NEW_RELIC_LICENSE_KEY` — your [New Relic license key](https://docs.newrelic.com/docs/apis/intro-apis/new-relic-api-keys/#license-key) (**required**)
+    - `NEW_RELIC_OTLP_ENDPOINT` — change to `https://otlp.eu01.nr-data.net:4317` for EU accounts
 
 2. Deploy the Kafka cluster and OTel Collector:
     ```shell

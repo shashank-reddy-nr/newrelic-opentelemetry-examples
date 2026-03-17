@@ -182,20 +182,6 @@ data:
           exporters: [otlp/newrelic]
 
 ---
-# ── Collector environment config (non-sensitive) ─────────────────────────
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: collector-env-config
-  namespace: kafka
-data:
-  # US accounts (default): https://otlp.nr-data.net:4317
-  # EU accounts: https://otlp.eu01.nr-data.net:4317
-  NEW_RELIC_OTLP_ENDPOINT: "https://otlp.nr-data.net:4317"
-  # Edit to match KAFKA_CLUSTER_NAME in kafka.yaml
-  KAFKA_CLUSTER_NAME: "kafka-k8s-cluster"
-
----
 # ── Collector Deployment ──────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -214,23 +200,22 @@ spec:
     spec:
       containers:
         - name: otel-collector
-          image: otel/opentelemetry-collector-contrib:latest
+          # NRDOT is New Relic's OTel distribution; swap image to use upstream otelcol-contrib.
+          image: newrelic/nrdot-collector:latest
+          args: ["--config=/etc/otelcol-contrib/config.yaml"]
           env:
             - name: NEW_RELIC_LICENSE_KEY
               valueFrom:
                 secretKeyRef:
                   name: newrelic-secret
-                  key: licenseKey
+                  key: NEW_RELIC_LICENSE_KEY
             - name: NEW_RELIC_OTLP_ENDPOINT
               valueFrom:
-                configMapKeyRef:
-                  name: collector-env-config
+                secretKeyRef:
+                  name: newrelic-secret
                   key: NEW_RELIC_OTLP_ENDPOINT
             - name: KAFKA_CLUSTER_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: collector-env-config
-                  key: KAFKA_CLUSTER_NAME
+              value: "kafka-k8s-cluster"
           volumeMounts:
             - name: config
               mountPath: /etc/otelcol-contrib
