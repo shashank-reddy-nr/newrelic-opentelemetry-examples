@@ -251,6 +251,19 @@ data:
 
       cumulativetodelta: {}
 
+      groupbyattrs/cluster:
+        keys: [kafka.cluster.name]
+
+      metricstransform/cluster_max:
+        transforms:
+          - include: "kafka\\.partition\\.offline|kafka\\.leader\\.election\\.rate|kafka\\.unclean\\.election\\.rate|kafka\\.partition\\.non_preferred_leader|kafka\\.broker\\.fenced\\.count|kafka\\.cluster\\.partition\\.count|kafka\\.cluster\\.topic\\.count"
+            match_type: regexp
+            action: update
+            operations:
+              - action: aggregate_labels
+                aggregation_type: max
+                label_set: []
+
     exporters:
       otlp/newrelic:
         endpoint: ${env:NEW_RELIC_OTLP_ENDPOINT}
@@ -290,6 +303,8 @@ data:
             - transform/remove_broker_id
             - memory_limiter
             - cumulativetodelta
+            - groupbyattrs/cluster
+            - metricstransform/cluster_max
             - batch/export
           exporters: [otlp/newrelic]
 
